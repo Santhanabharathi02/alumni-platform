@@ -6,11 +6,7 @@
     <title>@yield('title', 'SMTEC Alumni Hub')</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @else
-        <link rel="stylesheet" href="{{ asset('css/app-fallback.css') }}">
-    @endif
+    <link rel="stylesheet" href="{{ asset('css/app-fallback.css') }}">
 </head>
 <body class="admin-body">
 
