@@ -19,7 +19,8 @@ if [ -z "$APP_KEY" ]; then
     php artisan key:generate --force
 fi
 
-# Cache config, routes, views for performance
+# Clear any stale compiled state from previous deploys, then rebuild what we can.
+php artisan optimize:clear || true
 php artisan config:cache || true
 php artisan route:cache || true
 php artisan view:cache || true
