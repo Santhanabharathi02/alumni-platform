@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\Schema;
 
 class Alumni extends Model
 {
@@ -34,6 +35,39 @@ class Alumni extends Model
         'available_for_internships' => 'boolean',
     ];
 
+    public static function searchableColumns(): array
+    {
+        $table = (new self())->getTable();
+        $columns = [];
+
+        foreach (['first_name', 'last_name', 'name', 'email', 'company', 'job_title'] as $column) {
+            if (Schema::hasColumn($table, $column)) {
+                $columns[] = $column;
+            }
+        }
+
+        return $columns;
+    }
+
+    public static function nameSortColumns(): array
+    {
+        $table = (new self())->getTable();
+
+        if (Schema::hasColumn($table, 'last_name') && Schema::hasColumn($table, 'first_name')) {
+            return ['last_name', 'first_name'];
+        }
+
+        if (Schema::hasColumn($table, 'name')) {
+            return ['name'];
+        }
+
+        if (Schema::hasColumn($table, 'email')) {
+            return ['email'];
+        }
+
+        return ['id'];
+    }
+
     public function mentorships(): HasMany
     {
         return $this->hasMany(Mentorship::class);
@@ -56,7 +90,17 @@ class Alumni extends Model
 
     public function getFullNameAttribute(): string
     {
-        return trim("{$this->first_name} {$this->last_name}");
+        $firstName = (string) $this->getAttribute('first_name');
+        $lastName = (string) $this->getAttribute('last_name');
+        $fullName = trim($firstName.' '.$lastName);
+
+        if ($fullName !== '') {
+            return $fullName;
+        }
+
+        $name = trim((string) $this->getAttribute('name'));
+
+        return $name !== '' ? $name : (string) $this->getAttribute('email');
     }
 
     public function getPhotoUrlAttribute(): string
@@ -64,7 +108,21 @@ class Alumni extends Model
         if ($this->photo_path) {
             return asset('storage/' . $this->photo_path);
         }
-        $initials = urlencode(strtoupper(substr($this->first_name, 0, 1) . substr($this->last_name, 0, 1)));
+
+        $fullName = $this->full_name;
+        $parts = preg_split('/\s+/', trim($fullName)) ?: [];
+        $initials = '';
+
+        foreach (array_slice($parts, 0, 2) as $part) {
+            $initials .= strtoupper(substr($part, 0, 1));
+        }
+
+        if ($initials === '') {
+            $initials = strtoupper(substr((string) $this->getAttribute('email'), 0, 2));
+        }
+
+        $initials = urlencode($initials);
+
         return "https://ui-avatars.com/api/?name={$initials}&background=6366f1&color=fff&size=128";
     }
 }

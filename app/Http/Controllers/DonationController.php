@@ -30,7 +30,11 @@ class DonationController extends Controller
         $user = Auth::user();
 
         $alumni = $user->isAdmin()
-            ? Alumni::orderBy('last_name')->get()
+            ? tap(Alumni::query(), function ($query) {
+                foreach (Alumni::nameSortColumns() as $column) {
+                    $query->orderBy($column, 'asc');
+                }
+            })->get()
             : collect([$user->alumni])->filter();
 
         return view('donations.create', [
@@ -66,7 +70,13 @@ class DonationController extends Controller
     public function edit(Donation $donation)
     {
         $this->authorizeDonationAccess($donation);
-        $alumni = Alumni::orderBy('last_name')->get();
+        $alumniQuery = Alumni::query();
+
+        foreach (Alumni::nameSortColumns() as $column) {
+            $alumniQuery->orderBy($column, 'asc');
+        }
+
+        $alumni = $alumniQuery->get();
 
         return view('donations.edit', compact('donation', 'alumni'));
     }

@@ -30,7 +30,11 @@ class MentorshipController extends Controller
         $user = Auth::user();
 
         $alumni = $user->isAdmin()
-            ? Alumni::orderBy('last_name')->get()
+            ? tap(Alumni::query(), function ($query) {
+                foreach (Alumni::nameSortColumns() as $column) {
+                    $query->orderBy($column, 'asc');
+                }
+            })->get()
             : collect([$user->alumni])->filter();
 
         return view('mentorships.create', [
@@ -66,7 +70,13 @@ class MentorshipController extends Controller
     public function edit(Mentorship $mentorship)
     {
         $this->authorizeMentorshipAccess($mentorship);
-        $alumni = Alumni::orderBy('last_name')->get();
+        $alumniQuery = Alumni::query();
+
+        foreach (Alumni::nameSortColumns() as $column) {
+            $alumniQuery->orderBy($column, 'asc');
+        }
+
+        $alumni = $alumniQuery->get();
 
         return view('mentorships.edit', compact('mentorship', 'alumni'));
     }

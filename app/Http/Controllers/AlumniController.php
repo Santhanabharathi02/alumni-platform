@@ -19,16 +19,15 @@ class AlumniController extends Controller
         if ($request->filled('q')) {
             $search = $request->string('q');
             $searchTerms = explode(' ', trim($search));
+            $searchColumns = Alumni::searchableColumns();
             
-            $query->where(function ($builder) use ($searchTerms) {
+            $query->where(function ($builder) use ($searchTerms, $searchColumns) {
                 foreach ($searchTerms as $term) {
                     $term = "%{$term}%";
-                    $builder->where(function ($subBuilder) use ($term) {
-                        $subBuilder->where('first_name', 'like', $term)
-                            ->orWhere('last_name', 'like', $term)
-                            ->orWhere('email', 'like', $term)
-                            ->orWhere('company', 'like', $term)
-                            ->orWhere('job_title', 'like', $term);
+                    $builder->where(function ($subBuilder) use ($term, $searchColumns) {
+                        foreach ($searchColumns as $column) {
+                            $subBuilder->orWhere($column, 'like', $term);
+                        }
                     });
                 }
             });
@@ -44,10 +43,11 @@ class AlumniController extends Controller
             $query->where('is_mentor', true);
         }
 
-        $alumni = $query->orderBy('last_name')
-            ->orderBy('first_name')
-            ->paginate(10)
-            ->withQueryString();
+        foreach (Alumni::nameSortColumns() as $column) {
+            $query->orderBy($column, 'asc');
+        }
+
+        $alumni = $query->paginate(10)->withQueryString();
 
         $departments = Alumni::select('department')->whereNotNull('department')->distinct()->orderBy('department')->pluck('department');
         $gradYears = Alumni::select('graduation_year')->whereNotNull('graduation_year')->distinct()->orderByDesc('graduation_year')->pluck('graduation_year');
@@ -133,7 +133,7 @@ class AlumniController extends Controller
         $tempPassword = ucfirst(Str::random(6)) . rand(10, 99) . '!';
 
         User::create([
-            'name'      => $alumnus->first_name . ' ' . $alumnus->last_name,
+            'name'      => $alumnus->full_name,
             'email'     => $alumnus->email,
             'password'  => Hash::make($tempPassword),
             'role'      => 'alumni',
@@ -148,7 +148,13 @@ class AlumniController extends Controller
     public function export()
     {
         if (Auth::check() && Auth::user()?->role === 'alumni') { abort(403); }
-        $alumni = Alumni::orderBy('last_name')->orderBy('first_name')->get();
+        $alumniQuery = Alumni::query();
+
+        foreach (Alumni::nameSortColumns() as $column) {
+            $alumniQuery->orderBy($column, 'asc');
+        }
+
+        $alumni = $alumniQuery->get();
         $filename = 'alumni-export-' . now()->format('Y-m-d') . '.csv';
         $headers = ['Content-Type' => 'text/csv', 'Content-Disposition' => 'attachment; filename="' . $filename . '"'];
         $columns = ['ID','First Name','Last Name','Email','Phone','Graduation Year','Degree','Department','Company','Job Title','Location','LinkedIn','Is Mentor','Available for Internships','Last Contacted','Created At'];
@@ -156,7 +162,7 @@ class AlumniController extends Controller
             $out = fopen('php://output', 'w');
             fputcsv($out, $columns);
             foreach ($alumni as $a) {
-                fputcsv($out, [$a->id,$a->first_name,$a->last_name,$a->email,$a->phone,$a->graduation_year,$a->degree,$a->department,$a->company,$a->job_title,$a->location,$a->linkedin_url,$a->is_mentor?'Yes':'No',$a->available_for_internships?'Yes':'No',$a->last_contacted_at?->format('Y-m-d'),$a->created_at->format('Y-m-d')]);
+                fputcsv($out, [$a->id,$a->first_name ?? '',$a->last_name ?? '',$a->email,$a->phone,$a->graduation_year,$a->degree,$a->department,$a->company,$a->job_title,$a->location,$a->linkedin_url,$a->is_mentor?'Yes':'No',$a->available_for_internships?'Yes':'No',$a->last_contacted_at?->format('Y-m-d'),$a->created_at->format('Y-m-d')]);
             }
             fclose($out);
         };
